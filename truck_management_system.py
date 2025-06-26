@@ -228,6 +228,116 @@ class TruckDeliverySystem:
             self.truck_capacity_entry.insert(0, values[3])
             self.truck_status_combo.set(values[4])
     
+        # Driver Management Methods
+    def add_driver(self):
+        """Add a new driver to the database"""
+        try:
+            name = self.driver_name_entry.get().strip()
+            license_number = self.driver_license_entry.get().strip()
+            phone = self.driver_phone_entry.get().strip()
+            email = self.driver_email_entry.get().strip()
+            status = self.driver_status_combo.get()
+            
+            if not name or not license_number:
+                messagebox.showerror("Error", "Name and license number are required!")
+                return
+            
+            # Validate email if provided
+            if email and not re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', email):
+                messagebox.showerror("Error", "Please enter a valid email address!")
+                return
+            
+            self.cursor.execute('''
+                INSERT INTO drivers (name, license_number, phone, email, status, hire_date)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (name, license_number, phone, email, status, date.today()))
+            
+            self.conn.commit()
+            messagebox.showinfo("Success", "Driver added successfully!")
+            self.clear_driver_fields()
+            self.refresh_driver_data()
+            
+        except sqlite3.IntegrityError:
+            messagebox.showerror("Error", "License number already exists!")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to add driver: {str(e)}")
+    
+    def update_driver(self):
+        """Update selected driver"""
+        selected = self.driver_tree.selection()
+        if not selected:
+            messagebox.showwarning("Warning", "Please select a driver to update!")
+            return
+        
+        try:
+            driver_id = self.driver_tree.item(selected[0])['values'][0]
+            name = self.driver_name_entry.get().strip()
+            license_number = self.driver_license_entry.get().strip()
+            phone = self.driver_phone_entry.get().strip()
+            email = self.driver_email_entry.get().strip()
+            status = self.driver_status_combo.get()
+            
+            if not name or not license_number:
+                messagebox.showerror("Error", "Name and license number are required!")
+                return
+            
+            # Validate email if provided
+            if email and not re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', email):
+                messagebox.showerror("Error", "Please enter a valid email address!")
+                return
+            
+            self.cursor.execute('''
+                UPDATE drivers SET name=?, license_number=?, phone=?, email=?, status=?
+                WHERE id=?
+            ''', (name, license_number, phone, email, status, driver_id))
+            
+            self.conn.commit()
+            messagebox.showinfo("Success", "Driver updated successfully!")
+            self.clear_driver_fields()
+            self.refresh_driver_data()
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to update driver: {str(e)}")
+    
+    def delete_driver(self):
+        """Delete selected driver"""
+        selected = self.driver_tree.selection()
+        if not selected:
+            messagebox.showwarning("Warning", "Please select a driver to delete!")
+            return
+        
+        if messagebox.askyesno("Confirm", "Are you sure you want to delete this driver?"):
+            try:
+                driver_id = self.driver_tree.item(selected[0])['values'][0]
+                self.cursor.execute('DELETE FROM drivers WHERE id=?', (driver_id,))
+                self.conn.commit()
+                messagebox.showinfo("Success", "Driver deleted successfully!")
+                self.refresh_driver_data()
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to delete driver: {str(e)}")
+    
+    def clear_driver_fields(self):
+        """Clear driver input fields"""
+        self.driver_name_entry.delete(0, tk.END)
+        self.driver_license_entry.delete(0, tk.END)
+        self.driver_phone_entry.delete(0, tk.END)
+        self.driver_email_entry.delete(0, tk.END)
+        self.driver_status_combo.set('Available')
+    
+    def on_driver_select(self, event):
+        """Handle driver selection"""
+        selected = self.driver_tree.selection()
+        if selected:
+            values = self.driver_tree.item(selected[0])['values']
+            self.driver_name_entry.delete(0, tk.END)
+            self.driver_name_entry.insert(0, values[1])
+            self.driver_license_entry.delete(0, tk.END)
+            self.driver_license_entry.insert(0, values[2])
+            self.driver_phone_entry.delete(0, tk.END)
+            self.driver_phone_entry.insert(0, values[3] if values[3] else "")
+            self.driver_email_entry.delete(0, tk.END)
+            self.driver_email_entry.insert(0, values[4] if values[4] else "")
+            self.driver_status_combo.set(values[5])
     
 
 def main():
