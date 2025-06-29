@@ -38,7 +38,41 @@ class TruckDeliverySystem:
             )
         ''')
         
+        # Create drivers table
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS drivers (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                license_number TEXT UNIQUE NOT NULL,
+                phone TEXT,
+                email TEXT,
+                hire_date DATE,
+                status TEXT DEFAULT 'Available'
+            )
+        ''')
         
+        # Create deliveries table
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS deliveries (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                delivery_id TEXT UNIQUE NOT NULL,
+                truck_id INTEGER,
+                driver_id INTEGER,
+                pickup_location TEXT NOT NULL,
+                delivery_location TEXT NOT NULL,
+                cargo_description TEXT,
+                weight REAL,
+                scheduled_date DATE,
+                scheduled_time TEXT,
+                status TEXT DEFAULT 'Scheduled',
+                created_date DATE,
+                completed_date DATE,
+                FOREIGN KEY (truck_id) REFERENCES trucks (id),
+                FOREIGN KEY (driver_id) REFERENCES drivers (id)
+            )
+        ''')
+        
+        self.conn.commit()
     
     def create_main_interface(self):
         """Create the main user interface"""
@@ -127,6 +161,242 @@ class TruckDeliverySystem:
         # Bind selection event
         self.truck_tree.bind('<<TreeviewSelect>>', self.on_truck_select)
     
+    def create_driver_management_tab(self):
+        """Create driver management interface"""
+        driver_frame = ttk.Frame(self.notebook)
+        self.notebook.add(driver_frame, text="👨‍💼 Driver Management")
+        
+        # Control panel
+        control_frame = ttk.LabelFrame(driver_frame, text="Driver Controls", padding=10)
+        control_frame.pack(fill='x', padx=10, pady=5)
+        
+        # Input fields
+        fields_frame = ttk.Frame(control_frame)
+        fields_frame.pack(fill='x')
+        
+        # Driver name
+        ttk.Label(fields_frame, text="Driver Name:").grid(row=0, column=0, sticky='w', padx=5)
+        self.driver_name_entry = ttk.Entry(fields_frame, width=20)
+        self.driver_name_entry.grid(row=0, column=1, padx=5)
+        
+        # License number
+        ttk.Label(fields_frame, text="License Number:").grid(row=0, column=2, sticky='w', padx=5)
+        self.driver_license_entry = ttk.Entry(fields_frame, width=20)
+        self.driver_license_entry.grid(row=0, column=3, padx=5)
+        
+        # Phone
+        ttk.Label(fields_frame, text="Phone:").grid(row=1, column=0, sticky='w', padx=5, pady=5)
+        self.driver_phone_entry = ttk.Entry(fields_frame, width=20)
+        self.driver_phone_entry.grid(row=1, column=1, padx=5, pady=5)
+        
+        # Email
+        ttk.Label(fields_frame, text="Email:").grid(row=1, column=2, sticky='w', padx=5, pady=5)
+        self.driver_email_entry = ttk.Entry(fields_frame, width=20)
+        self.driver_email_entry.grid(row=1, column=3, padx=5, pady=5)
+        
+        # Status
+        ttk.Label(fields_frame, text="Status:").grid(row=2, column=0, sticky='w', padx=5, pady=5)
+        self.driver_status_combo = ttk.Combobox(fields_frame, values=['Available', 'On Duty', 'On Leave', 'Suspended'], width=17)
+        self.driver_status_combo.grid(row=2, column=1, padx=5, pady=5)
+        self.driver_status_combo.set('Available')
+        
+        # Buttons
+        button_frame = ttk.Frame(control_frame)
+        button_frame.pack(fill='x', pady=10)
+        
+        ttk.Button(button_frame, text="Add Driver", command=self.add_driver).pack(side='left', padx=5)
+        ttk.Button(button_frame, text="Update Driver", command=self.update_driver).pack(side='left', padx=5)
+        ttk.Button(button_frame, text="Delete Driver", command=self.delete_driver).pack(side='left', padx=5)
+        ttk.Button(button_frame, text="Clear Fields", command=self.clear_driver_fields).pack(side='left', padx=5)
+        
+        # Driver list
+        list_frame = ttk.LabelFrame(driver_frame, text="Driver List", padding=10)
+        list_frame.pack(fill='both', expand=True, padx=10, pady=5)
+        
+        # Treeview for drivers
+        columns = ('ID', 'Name', 'License Number', 'Phone', 'Email', 'Status', 'Hire Date')
+        self.driver_tree = ttk.Treeview(list_frame, columns=columns, show='headings', height=15)
+        
+        for col in columns:
+            self.driver_tree.heading(col, text=col)
+            self.driver_tree.column(col, width=120)
+        
+        # Scrollbar
+        driver_scrollbar = ttk.Scrollbar(list_frame, orient='vertical', command=self.driver_tree.yview)
+        self.driver_tree.configure(yscrollcommand=driver_scrollbar.set)
+        
+        self.driver_tree.pack(side='left', fill='both', expand=True)
+        driver_scrollbar.pack(side='right', fill='y')
+        
+        # Bind selection event
+        self.driver_tree.bind('<<TreeviewSelect>>', self.on_driver_select)
+    
+    def create_delivery_scheduling_tab(self):
+        """Create delivery scheduling interface"""
+        delivery_frame = ttk.Frame(self.notebook)
+        self.notebook.add(delivery_frame, text="📅 Delivery Scheduling")
+        
+        # Control panel
+        control_frame = ttk.LabelFrame(delivery_frame, text="Schedule Delivery", padding=10)
+        control_frame.pack(fill='x', padx=10, pady=5)
+        
+        # Input fields
+        fields_frame = ttk.Frame(control_frame)
+        fields_frame.pack(fill='x')
+        
+        # Delivery ID
+        ttk.Label(fields_frame, text="Delivery ID:").grid(row=0, column=0, sticky='w', padx=5)
+        self.delivery_id_entry = ttk.Entry(fields_frame, width=15)
+        self.delivery_id_entry.grid(row=0, column=1, padx=5)
+        
+        # Truck selection
+        ttk.Label(fields_frame, text="Truck:").grid(row=0, column=2, sticky='w', padx=5)
+        self.delivery_truck_combo = ttk.Combobox(fields_frame, width=15)
+        self.delivery_truck_combo.grid(row=0, column=3, padx=5)
+        
+        # Driver selection
+        ttk.Label(fields_frame, text="Driver:").grid(row=0, column=4, sticky='w', padx=5)
+        self.delivery_driver_combo = ttk.Combobox(fields_frame, width=15)
+        self.delivery_driver_combo.grid(row=0, column=5, padx=5)
+        
+        # Pickup location
+        ttk.Label(fields_frame, text="Pickup Location:").grid(row=1, column=0, sticky='w', padx=5, pady=5)
+        self.pickup_location_entry = ttk.Entry(fields_frame, width=25)
+        self.pickup_location_entry.grid(row=1, column=1, columnspan=2, padx=5, pady=5, sticky='ew')
+        
+        # Delivery location
+        ttk.Label(fields_frame, text="Delivery Location:").grid(row=1, column=3, sticky='w', padx=5, pady=5)
+        self.delivery_location_entry = ttk.Entry(fields_frame, width=25)
+        self.delivery_location_entry.grid(row=1, column=4, columnspan=2, padx=5, pady=5, sticky='ew')
+        
+        # Cargo description
+        ttk.Label(fields_frame, text="Cargo Description:").grid(row=2, column=0, sticky='w', padx=5, pady=5)
+        self.cargo_description_entry = ttk.Entry(fields_frame, width=30)
+        self.cargo_description_entry.grid(row=2, column=1, columnspan=2, padx=5, pady=5, sticky='ew')
+        
+        # Weight
+        ttk.Label(fields_frame, text="Weight (tons):").grid(row=2, column=3, sticky='w', padx=5, pady=5)
+        self.cargo_weight_entry = ttk.Entry(fields_frame, width=15)
+        self.cargo_weight_entry.grid(row=2, column=4, padx=5, pady=5)
+        
+        # Scheduled date
+        ttk.Label(fields_frame, text="Scheduled Date:").grid(row=3, column=0, sticky='w', padx=5, pady=5)
+        self.scheduled_date_entry = ttk.Entry(fields_frame, width=15)
+        self.scheduled_date_entry.grid(row=3, column=1, padx=5, pady=5)
+        self.scheduled_date_entry.insert(0, datetime.now().strftime('%Y-%m-%d'))
+        
+        # Scheduled time
+        ttk.Label(fields_frame, text="Scheduled Time:").grid(row=3, column=2, sticky='w', padx=5, pady=5)
+        self.scheduled_time_entry = ttk.Entry(fields_frame, width=15)
+        self.scheduled_time_entry.grid(row=3, column=3, padx=5, pady=5)
+        self.scheduled_time_entry.insert(0, '09:00')
+        
+        # Status
+        ttk.Label(fields_frame, text="Status:").grid(row=3, column=4, sticky='w', padx=5, pady=5)
+        self.delivery_status_combo = ttk.Combobox(fields_frame, values=['Scheduled', 'In Progress', 'Completed', 'Cancelled'], width=12)
+        self.delivery_status_combo.grid(row=3, column=5, padx=5, pady=5)
+        self.delivery_status_combo.set('Scheduled')
+        
+        # Buttons
+        button_frame = ttk.Frame(control_frame)
+        button_frame.pack(fill='x', pady=10)
+        
+        ttk.Button(button_frame, text="Schedule Delivery", command=self.schedule_delivery).pack(side='left', padx=5)
+        ttk.Button(button_frame, text="Update Delivery", command=self.update_delivery).pack(side='left', padx=5)
+        ttk.Button(button_frame, text="Cancel Delivery", command=self.cancel_delivery).pack(side='left', padx=5)
+        ttk.Button(button_frame, text="Clear Fields", command=self.clear_delivery_fields).pack(side='left', padx=5)
+        ttk.Button(button_frame, text="Generate ID", command=self.generate_delivery_id).pack(side='left', padx=5)
+        
+        # Delivery list
+        list_frame = ttk.LabelFrame(delivery_frame, text="Scheduled Deliveries", padding=10)
+        list_frame.pack(fill='both', expand=True, padx=10, pady=5)
+        
+        # Treeview for deliveries
+        columns = ('ID', 'Delivery ID', 'Truck', 'Driver', 'Pickup', 'Delivery', 'Date', 'Time', 'Status')
+        self.delivery_tree = ttk.Treeview(list_frame, columns=columns, show='headings', height=12)
+        
+        for col in columns:
+            self.delivery_tree.heading(col, text=col)
+            self.delivery_tree.column(col, width=100)
+        
+        # Scrollbar
+        delivery_scrollbar = ttk.Scrollbar(list_frame, orient='vertical', command=self.delivery_tree.yview)
+        self.delivery_tree.configure(yscrollcommand=delivery_scrollbar.set)
+        
+        self.delivery_tree.pack(side='left', fill='both', expand=True)
+        delivery_scrollbar.pack(side='right', fill='y')
+        
+        # Bind selection event
+        self.delivery_tree.bind('<<TreeviewSelect>>', self.on_delivery_select)
+    
+    def create_delivery_tracking_tab(self):
+        """Create delivery tracking interface"""
+        tracking_frame = ttk.Frame(self.notebook)
+        self.notebook.add(tracking_frame, text="📍 Delivery Tracking")
+        
+        # Search panel
+        search_frame = ttk.LabelFrame(tracking_frame, text="Track Delivery", padding=10)
+        search_frame.pack(fill='x', padx=10, pady=5)
+        
+        ttk.Label(search_frame, text="Search by Delivery ID:").pack(side='left', padx=5)
+        self.search_delivery_entry = ttk.Entry(search_frame, width=20)
+        self.search_delivery_entry.pack(side='left', padx=5)
+        ttk.Button(search_frame, text="Search", command=self.search_delivery).pack(side='left', padx=5)
+        ttk.Button(search_frame, text="Show All", command=self.show_all_deliveries).pack(side='left', padx=5)
+        
+        # Status filter
+        ttk.Label(search_frame, text="Filter by Status:").pack(side='left', padx=(20, 5))
+        self.status_filter_combo = ttk.Combobox(search_frame, values=['All', 'Scheduled', 'In Progress', 'Completed', 'Cancelled'], width=12)
+        self.status_filter_combo.pack(side='left', padx=5)
+        self.status_filter_combo.set('All')
+        ttk.Button(search_frame, text="Filter", command=self.filter_deliveries).pack(side='left', padx=5)
+        
+        # Delivery details
+        details_frame = ttk.LabelFrame(tracking_frame, text="Delivery Details", padding=10)
+        details_frame.pack(fill='both', expand=True, padx=10, pady=5)
+        
+        # Create text widget for details
+        self.delivery_details_text = tk.Text(details_frame, height=10, wrap='word')
+        details_scrollbar = ttk.Scrollbar(details_frame, orient='vertical', command=self.delivery_details_text.yview)
+        self.delivery_details_text.configure(yscrollcommand=details_scrollbar.set)
+        
+        self.delivery_details_text.pack(side='left', fill='both', expand=True)
+        details_scrollbar.pack(side='right', fill='y')
+        
+        # Status update panel
+        update_frame = ttk.LabelFrame(tracking_frame, text="Update Status", padding=10)
+        update_frame.pack(fill='x', padx=10, pady=5)
+        
+        ttk.Label(update_frame, text="Update Status:").pack(side='left', padx=5)
+        self.update_status_combo = ttk.Combobox(update_frame, values=['Scheduled', 'In Progress', 'Completed', 'Cancelled'], width=15)
+        self.update_status_combo.pack(side='left', padx=5)
+        ttk.Button(update_frame, text="Update Status", command=self.update_delivery_status).pack(side='left', padx=5)
+        ttk.Button(update_frame, text="Mark Completed", command=self.mark_completed).pack(side='left', padx=5)
+    
+    def create_reports_tab(self):
+        """Create reports interface"""
+        reports_frame = ttk.Frame(self.notebook)
+        self.notebook.add(reports_frame, text="📊 Reports")
+        
+        # Reports control panel
+        control_frame = ttk.LabelFrame(reports_frame, text="Generate Reports", padding=10)
+        control_frame.pack(fill='x', padx=10, pady=5)
+        
+        ttk.Button(control_frame, text="Truck Utilization Report", command=self.truck_utilization_report).pack(side='left', padx=5)
+        ttk.Button(control_frame, text="Driver Performance Report", command=self.driver_performance_report).pack(side='left', padx=5)
+        ttk.Button(control_frame, text="Delivery Summary Report", command=self.delivery_summary_report).pack(side='left', padx=5)
+        ttk.Button(control_frame, text="Monthly Report", command=self.monthly_report).pack(side='left', padx=5)
+        
+        # Reports display
+        reports_display_frame = ttk.LabelFrame(reports_frame, text="Report Results", padding=10)
+        reports_display_frame.pack(fill='both', expand=True, padx=10, pady=5)
+        
+        self.reports_text = tk.Text(reports_display_frame, wrap='word')
+        reports_scrollbar = ttk.Scrollbar(reports_display_frame, orient='vertical', command=self.reports_text.yview)
+        self.reports_text.configure(yscrollcommand=reports_scrollbar.set)
+        
+        self.reports_text.pack(side='left', fill='both', expand=True)
+        reports_scrollbar.pack(side='right', fill='y')
     
     # Truck Management Methods
     def add_truck(self):
@@ -228,7 +498,7 @@ class TruckDeliverySystem:
             self.truck_capacity_entry.insert(0, values[3])
             self.truck_status_combo.set(values[4])
     
-        # Driver Management Methods
+    # Driver Management Methods
     def add_driver(self):
         """Add a new driver to the database"""
         try:
@@ -339,7 +609,7 @@ class TruckDeliverySystem:
             self.driver_email_entry.insert(0, values[4] if values[4] else "")
             self.driver_status_combo.set(values[5])
     
-# Delivery Scheduling Methods
+    # Delivery Scheduling Methods
     def schedule_delivery(self):
         """Schedule a new delivery"""
         try:
@@ -923,7 +1193,6 @@ Completed Date: {delivery_data[14] or 'Not completed'}
         if hasattr(self, 'conn'):
             self.conn.close()
 
-            
 def main():
     """Main function to run the application"""
     root = tk.Tk()
